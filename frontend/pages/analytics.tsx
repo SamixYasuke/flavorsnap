@@ -105,38 +105,23 @@ const AnalyticsDashboard: React.FC = () => {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <header className="bg-white rounded-lg shadow-sm p-6 mb-6">
+
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
               <p className="text-gray-600 mt-1">Monitor usage patterns, model performance, and user engagement</p>
             </div>
-            <div className="flex gap-3" role="group" aria-label="Dashboard actions">
-              <button
-                onClick={handleRefresh}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition focus:outline-none focus:ring-4 focus:ring-blue-300 focus:ring-offset-2"
-                aria-describedby="refresh-desc"
+
               >
                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                 Refresh
               </button>
-              <span id="refresh-desc" className="sr-only">
-                Refresh analytics data with latest statistics
-              </span>
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition focus:outline-none focus:ring-4 focus:ring-green-300 focus:ring-offset-2"
-                aria-describedby="export-desc"
+in
               >
                 <Download className="w-4 h-4" />
                 Export Report
               </button>
-              <span id="export-desc" className="sr-only">
-                Download analytics report as JSON file
-              </span>
-            </div>
-          </div>
-        </header>
+
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
@@ -159,28 +144,12 @@ const AnalyticsDashboard: React.FC = () => {
         </div>
 
         {/* Date Range Filter */}
-        <section className="bg-white rounded-lg shadow-sm p-6 mb-6" aria-labelledby="filter-heading">
-          <h2 id="filter-heading" className="sr-only">Date Range Filter</h2>
-          <div className="flex items-center gap-4">
-            <Filter className="w-5 h-5 text-gray-600" aria-hidden="true" />
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-gray-600" aria-hidden="true" />
-              <label htmlFor="start-date" className="sr-only">Start date</label>
-              <input
-                id="start-date"
+
                 type="date"
                 value={dateRange.start}
                 onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                aria-describedby="date-range-desc"
-              />
-              <span id="date-range-desc" className="sr-only">
-                Select date range to filter analytics data
-              </span>
-              <span className="text-gray-600">to</span>
-              <label htmlFor="end-date" className="sr-only">End date</label>
-              <input
-                id="end-date"
+
                 type="date"
                 value={dateRange.end}
                 onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
@@ -188,7 +157,7 @@ const AnalyticsDashboard: React.FC = () => {
               />
             </div>
           </div>
-        </section>
+n
 
         {/* Charts Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
