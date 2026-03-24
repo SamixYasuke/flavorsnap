@@ -4,7 +4,11 @@ import torch
 from functools import wraps
 from typing import Dict, Any
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
-from flask import Flask, Response
+from flask import Flask, Response, request, make_response
+try:
+    from persistence import log_prediction_history
+except Exception:
+    log_prediction_history = None
 
 # Prometheus Metrics
 REQUEST_COUNT = Counter(
@@ -176,9 +180,13 @@ def track_inference(func):
     def wrapper(*args, **kwargs):
         start_time = time.time()
         status = 'success'
-        
+        resp_obj = None
         try:
             result = func(*args, **kwargs)
+            try:
+                resp_obj = make_response(result)
+            except Exception:
+                resp_obj = None
             return result
         except Exception as e:
             status = 'failure'
@@ -190,10 +198,26 @@ def track_inference(func):
             
             # Extract label from result if available
             label = 'unknown'
-            if 'result' in kwargs and hasattr(kwargs['result'], 'get'):
-                label = kwargs['result'].get('label', 'unknown')
+            payload = None
+            try:
+                if resp_obj is not None:
+                    payload = resp_obj.get_json(silent=True)
+                    if isinstance(payload, dict):
+                        label = payload.get('label', 'unknown')
+            except Exception:
+                payload = None
             
             MODEL_INFERENCE_COUNT.labels(label=label, status=status).inc()
+            try:
+                if log_prediction_history and isinstance(payload, dict):
+                    meta = {
+                        "request_id": request.headers.get("X-Request-Id"),
+                        "user_id": request.headers.get("X-User-Id"),
+                        "error_message": None if status == 'success' else 'inference_failed'
+                    }
+                    log_prediction_history(payload, duration, status, meta)
+            except Exception:
+                pass
     
     return wrapper
 
