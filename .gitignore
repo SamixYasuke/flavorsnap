@@ -48,7 +48,23 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# python
+__pycache__/
+*.py[cod]
+
 
 node_modules/
 dist/
 .env
+
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+*.whl
+.mypy_cache/
+.pytest_cache/
+htmlcov/
+*.log
