@@ -5,6 +5,13 @@ Additional API endpoints for model management, A/B testing, and deployment
 from flask import Flask, request, jsonify
 import json
 from datetime import datetime
+try:
+    from db_config import get_connection
+    from persistence import purge_old_history
+except Exception:
+    get_connection = lambda: None
+    def purge_old_history(days: int) -> int:  # type: ignore
+        return 0
 
 # Add these endpoints to the existing app.py file
 
@@ -285,6 +292,167 @@ def register_utility_endpoints(app):
         # This would need access to model_validator
         # For now, return empty response
         return jsonify({'history': []})
+
+    @app.route('/api/history', methods=['GET'])
+    def prediction_history():
+        """Get prediction history with optional filters"""
+        conn = get_connection()
+        if not conn:
+            return jsonify({'error': 'Database not configured'}), 503
+        try:
+            user_id = request.args.get('user_id')
+            label = request.args.get('label')
+            model_version = request.args.get('model_version')
+            start_date = request.args.get('start_date')
+            end_date = request.args.get('end_date')
+            limit = request.args.get('limit', type=int) or 50
+            offset = request.args.get('offset', type=int) or 0
+            clauses = []
+            params = []
+            if user_id:
+                clauses.append("user_id = %s")
+                params.append(user_id)
+            if label:
+                clauses.append("label = %s")
+                params.append(label)
+            if model_version:
+                clauses.append("model_version = %s")
+                params.append(model_version)
+            if start_date:
+                clauses.append("created_at >= %s")
+                params.append(start_date)
+            if end_date:
+                clauses.append("created_at <= %s")
+                params.append(end_date)
+            where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(f"""
+                        SELECT id::text, request_id, user_id, image_filename, label, confidence,
+                               all_predictions::text, processing_time, model_version, success,
+                               error_message, created_at
+                        FROM prediction_history
+                        {where}
+                        ORDER BY created_at DESC
+                        LIMIT %s OFFSET %s
+                    """, (*params, limit, offset))
+                    rows = cur.fetchall() or []
+            items = []
+            for r in rows:
+                items.append({
+                    'id': r[0],
+                    'request_id': r[1],
+                    'user_id': r[2],
+                    'image_filename': r[3],
+                    'label': r[4],
+                    'confidence': r[5],
+                    'all_predictions': json.loads(r[6]) if r[6] else [],
+                    'processing_time': r[7],
+                    'model_version': r[8],
+                    'success': r[9],
+                    'error_message': r[10],
+                    'created_at': r[11].isoformat() if r[11] else None
+                })
+            return jsonify({'items': items, 'count': len(items), 'limit': limit, 'offset': offset})
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    @app.route('/api/history/<id>', methods=['GET'])
+    def prediction_history_item(id):
+        conn = get_connection()
+        if not conn:
+            return jsonify({'error': 'Database not configured'}), 503
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT id::text, request_id, user_id, image_filename, label, confidence,
+                               all_predictions::text, processing_time, model_version, success,
+                               error_message, created_at
+                        FROM prediction_history
+                        WHERE id = %s
+                        """, (id,))
+                    r = cur.fetchone()
+                    if not r:
+                        return jsonify({'error': 'Not found'}), 404
+            item = {
+                'id': r[0],
+                'request_id': r[1],
+                'user_id': r[2],
+                'image_filename': r[3],
+                'label': r[4],
+                'confidence': r[5],
+                'all_predictions': json.loads(r[6]) if r[6] else [],
+                'processing_time': r[7],
+                'model_version': r[8],
+                'success': r[9],
+                'error_message': r[10],
+                'created_at': r[11].isoformat() if r[11] else None
+            }
+            return jsonify(item)
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    @app.route('/api/metrics/model', methods=['GET'])
+    def model_metrics():
+        conn = get_connection()
+        if not conn:
+            return jsonify({'error': 'Database not configured'}), 503
+        try:
+            model_version = request.args.get('model_version')
+            start_date = request.args.get('start_date')
+            end_date = request.args.get('end_date')
+            clauses = []
+            params = []
+            if model_version:
+                clauses.append("model_version = %s")
+                params.append(model_version)
+            if start_date:
+                clauses.append("metric_date >= %s")
+                params.append(start_date)
+            if end_date:
+                clauses.append("metric_date <= %s")
+                params.append(end_date)
+            where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+            with conn:
+                with conn.cursor() as cur:
+                    cur.execute(f"""
+                        SELECT model_version, metric_date, total_predictions, avg_confidence, avg_processing_time
+                        FROM model_performance_metrics
+                        {where}
+                        ORDER BY metric_date DESC, model_version
+                    """, (*params,))
+                    rows = cur.fetchall() or []
+            items = []
+            for r in rows:
+                items.append({
+                    'model_version': r[0],
+                    'date': r[1].isoformat(),
+                    'total_predictions': r[2],
+                    'avg_confidence': float(r[3]) if r[3] is not None else None,
+                    'avg_processing_time': float(r[4]) if r[4] is not None else None
+                })
+            return jsonify({'items': items, 'count': len(items)})
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+    @app.route('/admin/retention/run', methods=['POST'])
+    def run_retention():
+        days = request.args.get('days', type=int) or 90
+        try:
+            deleted = purge_old_history(days)
+            return jsonify({'status': 'ok', 'deleted': deleted, 'days': days})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
 # Function to register all endpoints
 def register_all_endpoints(app, model_registry, ab_test_manager, deployment_manager, model_validator):
