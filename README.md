@@ -58,42 +58,51 @@ Snap a picture of your food and let AI identify the dish instantly!
 
 ## 🏗️ Project Structure
 
+FlavorSnap follows a modular microservices architecture with clear separation of concerns. For complete documentation, see [Project Structure Documentation](docs/project_structure.md).
+
+### Quick Overview
+
 ```
 flavorsnap/
 ├── 📁 frontend/                    # Next.js web application
-│   ├── 📁 pages/                   # React pages and API routes
-│   │   ├── 📄 index.tsx           # Landing page
-│   │   ├── 📄 classify.tsx        # Classification interface
-│   │   └── 📁 api/                # Backend API endpoints
-│   ├── 📁 public/                 # Static assets
-│   │   ├── 📁 images/             # Hero images and icons
-│   │   └── 📄 favicon.ico
-│   ├── 📁 styles/                 # Global CSS and Tailwind
-│   ├── 📄 package.json            # Frontend dependencies
-│   └── 📄 tsconfig.json           # TypeScript configuration
 ├── 📁 ml-model-api/               # Flask ML inference API
-│   ├── 📄 app.py                  # Main Flask application
-│   ├── 📄 requirements.txt        # Python dependencies
-│   └── 📄 model_loader.py         # Model loading utilities
 ├── 📁 contracts/                  # Soroban smart contracts
-│   ├── 📁 model-governance/       # Model governance contracts
-│   ├── 📁 tokenized-incentive/    # Token incentive system
-│   └── 📁 sensory-evaluation/     # Sensory evaluation contracts
+├── 📁 flavorsnap-food-registry/   # Rust-based food registry
 ├── 📁 dataset/                    # Training and validation data
-│   ├── 📁 train/                  # Training images by class
-│   ├── 📁 test/                   # Test images
-│   └── 📄 data_split.py           # Dataset utilities
 ├── 📁 models/                     # Trained model files
-├── 📁 uploads/                    # User uploaded images
-├── 📁 pages/                      # Additional documentation
-├── 📄 model.pth                   # Trained PyTorch model (44MB)
-├── 📄 food_classes.txt            # List of food categories
-├── 📄 train_model.ipynb           # Model training notebook
-├── 📄 dashboard.py                # Panel-based dashboard
-├── 📄 Cargo.toml                  # Rust workspace configuration
-├── 📄 PROJECT_ISSUES.md           # Known issues and roadmap
-└── 📄 README.md                   # This file
+├── 📁 docs/                       # Comprehensive documentation
+├── � scripts/                    # Utility and setup scripts
+├── 📁 config/                     # Configuration files
+└── 📁 uploads/                    # User uploaded images
 ```
+
+### Key Components
+
+- **🎨 Frontend**: Next.js 15 with React 19, TypeScript, TailwindCSS
+- **🧠 ML API**: Flask with PyTorch ResNet18 model
+- **⛓️ Blockchain**: Soroban smart contracts on Stellar
+- **📊 Analytics**: Classification history and insights
+- **🐳 Containers**: Docker support for all environments
+
+### Documentation Structure
+
+| Document | Purpose |
+|----------|---------|
+| **[Project Structure](docs/project_structure.md)** | Complete directory structure and organization |
+| **[Development Workflow](docs/development_workflow.md)** | Development process and guidelines |
+| **[File Purposes](docs/file_purposes.md)** | Detailed file responsibilities |
+| **[Installation Guide](docs/installation.md)** | Comprehensive setup instructions |
+| **[Configuration Guide](docs/configuration.md)** | Configuration options and settings |
+| **[Troubleshooting Guide](docs/troubleshooting.md)** | Common issues and solutions |
+
+### Development Tools
+
+- **� Structure Analysis**: `python scripts/analyze_structure.py`
+- **⚡ Quick Setup**: `python scripts/install.py`
+- **🧪 Environment Check**: `python scripts/check_environment.py`
+- **� Docker Management**: `./scripts/docker_run.sh`
+
+For detailed information about project organization, file purposes, and development workflows, please refer to the comprehensive documentation in the `docs/` directory.
 
 ## 🛠️ Tech Stack
 
