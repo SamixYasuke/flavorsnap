@@ -1,0 +1,47 @@
+# Development Dockerfile for FlavorSnap - Backend
+# Optimized for hot reloading and development workflow
+
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies for development
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    curl \
+    vim \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY ml-model-api/requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir flask-cors pytest pytest-cov black flake8
+
+# Copy application code
+COPY model.pth ./
+COPY ml-model-api/ ./
+
+# Create directories
+RUN mkdir -p /app/uploads /app/logs
+
+# Expose development port
+EXPOSE 5000
+
+# Environment variables for development
+ENV FLASK_ENV=development
+ENV FLASK_DEBUG=1
+ENV PYTHONPATH=/app
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5000/health || exit 1
+
+# Start development server with hot reload
+CMD ["python", "app.py"]

@@ -1,0 +1,268 @@
+# FlavorSnap Default Configuration
+# This file contains default configuration values for all environments
+
+# Application Settings
+app:
+  name: "FlavorSnap"
+  version: "1.0.0"
+  environment: "${NODE_ENV:-development}"
+  debug: "${DEBUG:-false}"
+  
+# Docker Configuration
+docker:
+  registry: "${DOCKER_REGISTRY:-}"
+  image_tag: "${IMAGE_TAG:-latest}"
+  
+  build:
+    no_cache: false
+    parallel: true
+    pull: true
+  
+  runtime:
+    restart_policy: "unless-stopped"
+    auto_remove: false
+    
+# Frontend Configuration
+frontend:
+  container:
+    name: "flavorsnap-frontend"
+    port: 3000
+    replicas: "${FRONTEND_REPLICAS:-1}"
+    
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+      
+  health_check:
+    path: "/"
+    interval: "30s"
+    timeout: "10s"
+    retries: 3
+    
+  environment:
+    NODE_ENV: "${NODE_ENV:-development}"
+    NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL:-http://backend:5000}"
+    NEXT_PUBLIC_MODEL_ENDPOINT: "${NEXT_PUBLIC_MODEL_ENDPOINT:-/predict}"
+    MAX_FILE_SIZE: "${MAX_FILE_SIZE:-10485760}"
+    ALLOWED_FILE_TYPES: "${ALLOWED_FILE_TYPES:-jpg,jpeg,png,webp}"
+    MODEL_CONFIDENCE_THRESHOLD: "${MODEL_CONFIDENCE_THRESHOLD:-0.6}"
+    ENABLE_ANALYTICS: "${ENABLE_ANALYTICS:-false}"
+    ENABLE_DARK_MODE: "${ENABLE_DARK_MODE:-true}"
+    ENABLE_CLASSIFICATION_HISTORY: "${ENABLE_CLASSIFICATION_HISTORY:-true}"
+
+# Backend Configuration
+backend:
+  container:
+    name: "flavorsnap-backend"
+    port: 5000
+    replicas: "${BACKEND_REPLICAS:-1}"
+    
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+      
+  health_check:
+    path: "/health"
+    interval: "30s"
+    timeout: "10s"
+    retries: 3
+    
+  environment:
+    FLASK_ENV: "${FLASK_ENV:-development}"
+    FLASK_DEBUG: "${FLASK_DEBUG:-1}"
+    PYTHONPATH: "/app"
+    MODEL_CONFIDENCE_THRESHOLD: "${MODEL_CONFIDENCE_THRESHOLD:-0.6}"
+    UPLOAD_FOLDER: "/app/uploads"
+    LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+    
+  model:
+    path: "/app/model.pth"
+    classes_file: "/app/food_classes.txt"
+    batch_size: "${MODEL_BATCH_SIZE:-32}"
+    max_image_size: "${MAX_IMAGE_SIZE:-224}"
+
+# Database Configuration
+database:
+  postgres:
+    host: "${POSTGRES_HOST:-postgres}"
+    port: "${POSTGRES_PORT:-5432}"
+    database: "${POSTGRES_DB:-flavorsnap}"
+    username: "${POSTGRES_USER:-flavorsnap}"
+    password: "${POSTGRES_PASSWORD}"
+    ssl_mode: "${POSTGRES_SSL_MODE:-prefer}"
+    
+    pool_size: "${DB_POOL_SIZE:-10}"
+    max_overflow: "${DB_MAX_OVERFLOW:-20}"
+    pool_timeout: "${DB_POOL_TIMEOUT:-30}"
+    
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+        
+  redis:
+    host: "${REDIS_HOST:-redis}"
+    port: "${REDIS_PORT:-6379}"
+    password: "${REDIS_PASSWORD}"
+    database: "${REDIS_DB:-0}"
+    
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+
+# Storage Configuration
+storage:
+  uploads:
+    path: "/app/uploads"
+    max_size: "${MAX_UPLOAD_SIZE:-50MB}"
+    cleanup_interval: "${UPLOAD_CLEANUP_INTERVAL:-24h}"
+    
+  models:
+    path: "/app/models"
+    backup_enabled: true
+    backup_interval: "${MODEL_BACKUP_INTERVAL:-7d}"
+
+# Monitoring Configuration
+monitoring:
+  prometheus:
+    enabled: "${PROMETHEUS_ENABLED:-true}"
+    port: 9090
+    retention: "${PROMETHEUS_RETENTION:-200h}"
+    scrape_interval: "${SCRAPE_INTERVAL:-15s}"
+    
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "500m"
+        
+  grafana:
+    enabled: "${GRAFANA_ENABLED:-true}"
+    port: 3000
+    admin_password: "${GRAFANA_PASSWORD}"
+    
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+
+# Logging Configuration
+logging:
+  level: "${LOG_LEVEL:-INFO}"
+  format: "json"
+  
+  containers:
+    max_size: "100m"
+    max_files: 5
+    
+  application:
+    path: "/app/logs"
+    rotation: "daily"
+    retention: "30d"
+
+# Security Configuration
+security:
+  containers:
+    non_root: true
+    read_only_rootfs: false
+    drop_capabilities:
+      - "ALL"
+    add_capabilities:
+      - "CHOWN"
+      - "SETGID"
+      - "SETUID"
+      
+  network:
+    internal: false
+    allow_external: true
+    
+  secrets:
+    enabled: true
+    provider: "environment"
+    
+  jwt:
+    secret: "${JWT_SECRET}"
+    algorithm: "HS256"
+    expiration: "24h"
+
+# Performance Configuration
+performance:
+  autoscaling:
+    enabled: "${AUTOSCALING_ENABLED:-true}"
+    min_replicas: "${MIN_REPLICAS:-1}"
+    max_replicas: "${MAX_REPLICAS:-10}"
+    target_cpu_utilization: "${TARGET_CPU_UTILIZATION:-70}"
+    target_memory_utilization: "${TARGET_MEMORY_UTILIZATION:-80}"
+    
+  caching:
+    enabled: "${CACHING_ENABLED:-true}"
+    ttl: "${CACHE_TTL:-3600s}"
+    max_size: "${CACHE_MAX_SIZE:-100MB}"
+
+# Feature Flags
+features:
+  social_sharing: "${ENABLE_SOCIAL_SHARING:-true}"
+  analytics_dashboard: "${ENABLE_ANALYTICS_DASHBOARD:-true}"
+  batch_processing: "${ENABLE_BATCH_PROCESSING:-true}"
+  xai_explanations: "${ENABLE_XAI_EXPLANATIONS:-true}"
+  ab_testing: "${ENABLE_AB_TESTING:-false}"
+
+# Health Check Configuration
+health:
+  interval: "${HEALTH_CHECK_INTERVAL:-30s}"
+  timeout: "${HEALTH_CHECK_TIMEOUT:-10s}"
+  retries: "${HEALTH_CHECK_RETRIES:-3}"
+  start_period: "${HEALTH_CHECK_START_PERIOD:-30s}"
+
+# Rate Limiting
+rate_limiting:
+  api:
+    requests_per_minute: "${RATE_LIMIT_REQUESTS_PER_MINUTE:-60}"
+    burst: "${RATE_LIMIT_BURST:-10}"
+    
+  upload:
+    requests_per_minute: "${UPLOAD_RATE_LIMIT_PER_MINUTE:-10}"
+    burst: "${UPLOAD_RATE_LIMIT_BURST:-3}"
+
+# External Services
+external_services:
+  email:
+    smtp_host: "${SMTP_HOST:-}"
+    smtp_port: "${SMTP_PORT:-587}"
+    smtp_user: "${SMTP_USER:-}"
+    smtp_password: "${SMTP_PASSWORD:-}"
+    
+  cloud_storage:
+    aws_s3_bucket: "${AWS_S3_BUCKET:-}"
+    aws_region: "${AWS_REGION:-us-east-1}"
+    aws_access_key_id: "${AWS_ACCESS_KEY_ID:-}"
+    aws_secret_access_key: "${AWS_SECRET_ACCESS_KEY:-}"
+    
+  cdn:
+    url: "${CDN_URL:-}"
+
+# SSL/TLS Configuration
+ssl:
+  cert_path: "${SSL_CERT_PATH:-}"
+  key_path: "${SSL_KEY_PATH:-}"
+  enabled: false

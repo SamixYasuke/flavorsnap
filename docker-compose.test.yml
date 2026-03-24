@@ -1,0 +1,129 @@
+version: '3.8'
+
+services:
+  # Test frontend service
+  frontend-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend.dev
+    environment:
+      - NODE_ENV=test
+      - NEXT_PUBLIC_API_URL=http://backend-test:5000
+      - CI=true
+    volumes:
+      - ./frontend:/app/frontend
+      - /app/frontend/node_modules
+    networks:
+      - flavorsnap-test-network
+    command: ["npm", "run", "test:ci"]
+    depends_on:
+      - backend-test
+
+  # Test backend service
+  backend-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    environment:
+      - FLASK_ENV=testing
+      - TESTING=true
+      - PYTHONPATH=/app
+    volumes:
+      - ./ml-model-api:/app/ml-model-api
+      - ./model.pth:/app/model.pth
+      - ./test-uploads:/app/uploads
+      - ./test-logs:/app/logs
+    networks:
+      - flavorsnap-test-network
+    command: ["python", "-m", "pytest", "tests/", "-v", "--cov=app", "--cov-report=xml", "--cov-report=html"]
+
+  # Integration test service
+  integration-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      - FRONTEND_URL=http://frontend-test:3000
+      - BACKEND_URL=http://backend-test:5000
+      - TEST_ENVIRONMENT=docker
+    volumes:
+      - ./tests:/app/tests
+      - ./test-results:/app/test-results
+    networks:
+      - flavorsnap-test-network
+    depends_on:
+      - frontend-test
+      - backend-test
+    command: ["python", "-m", "pytest", "tests/integration/", "-v", "--html=test-results/integration-report.html"]
+
+  # E2E test service with Playwright
+  e2e-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    environment:
+      - BASE_URL=http://frontend-test:3000
+      - CI=true
+    volumes:
+      - ./tests/e2e:/app/tests
+      - ./test-results:/app/test-results
+      - /dev/shm:/dev/shm
+    networks:
+      - flavorsnap-test-network
+    depends_on:
+      - frontend-test
+      - backend-test
+    command: ["npx", "playwright", "test", "--reporter=html", "--output-dir=test-results/e2e"]
+
+  # Performance testing service
+  performance-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.performance
+    environment:
+      - TARGET_URL=http://frontend-test:3000
+      - API_URL=http://backend-test:5000
+    volumes:
+      - ./tests/performance:/app/tests
+      - ./test-results:/app/test-results
+    networks:
+      - flavorsnap-test-network
+    depends_on:
+      - frontend-test
+      - backend-test
+    command: ["python", "tests/performance/run_performance_tests.py"]
+
+  # Security scanning service
+  security-scan:
+    image: securecodewarrior/docker-security-scanner:latest
+    volumes:
+      - .:/app
+      - ./security-reports:/reports
+    networks:
+      - flavorsnap-test-network
+    command: ["scan", "--output-format", "json", "--output-file", "/reports/security-scan.json"]
+
+  # Test database (isolated)
+  postgres-test:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: flavorsnap_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+    tmpfs:
+      - /var/lib/postgresql/data
+    networks:
+      - flavorsnap-test-network
+
+  # Test Redis (isolated)
+  redis-test:
+    image: redis:7-alpine
+    tmpfs:
+      - /data
+    networks:
+      - flavorsnap-test-network
+
+networks:
+  flavorsnap-test-network:
+    driver: bridge
+    internal: true

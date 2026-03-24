@@ -1,0 +1,151 @@
+# FlavorSnap Production Configuration
+# Production-specific overrides for default configuration
+
+# Application Settings
+app:
+  environment: "production"
+  debug: false
+  
+# Frontend Configuration
+frontend:
+  container:
+    replicas: 3
+    
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+      
+  environment:
+    NODE_ENV: "production"
+    ENABLE_ANALYTICS: true
+    ENABLE_DARK_MODE: true
+
+# Backend Configuration
+backend:
+  container:
+    replicas: 3
+    
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+      
+  environment:
+    FLASK_ENV: "production"
+    FLASK_DEBUG: 0
+    LOG_LEVEL: "INFO"
+
+# Database Configuration
+database:
+  postgres:
+    host: "postgres-service"
+    ssl_mode: "require"
+    
+    pool_size: 20
+    max_overflow: 40
+    pool_timeout: 60
+    
+  redis:
+    host: "redis-service"
+
+# Storage Configuration
+storage:
+  uploads:
+    path: "/app/uploads"
+    max_size: "50MB"
+    cleanup_interval: "24h"
+    
+  models:
+    path: "/app/models"
+    backup_enabled: true
+    backup_interval: "6h"
+
+# Monitoring Configuration
+monitoring:
+  prometheus:
+    enabled: true
+    retention: "30d"
+    
+  grafana:
+    enabled: true
+
+# Logging Configuration
+logging:
+  level: "INFO"
+  format: "json"
+  
+  application:
+    path: "/app/logs"
+    rotation: "daily"
+    retention: "30d"
+
+# Security Configuration
+security:
+  containers:
+    read_only_rootfs: true
+    drop_capabilities:
+      - "ALL"
+    add_capabilities: []
+    
+  network:
+    internal: false
+    allow_external: false
+    
+  secrets:
+    enabled: true
+    provider: "kubernetes"
+
+# Performance Configuration
+performance:
+  autoscaling:
+    enabled: true
+    min_replicas: 3
+    max_replicas: 20
+    target_cpu_utilization: 70
+    target_memory_utilization: 80
+    
+  caching:
+    enabled: true
+    ttl: "7200s"
+    max_size: "500MB"
+
+# Health Check Configuration
+health:
+  interval: "30s"
+  timeout: "10s"
+  retries: 3
+  start_period: "60s"
+
+# Rate Limiting
+rate_limiting:
+  api:
+    requests_per_minute: 60
+    burst: 10
+    
+  upload:
+    requests_per_minute: 10
+    burst: 3
+
+# External Services
+external_services:
+  email:
+    enabled: true
+    
+  cloud_storage:
+    enabled: true
+    
+  cdn:
+    enabled: true
+
+# SSL/TLS Configuration
+ssl:
+  enabled: true
+  cert_path: "/etc/ssl/certs/flavorsnap.crt"
+  key_path: "/etc/ssl/private/flavorsnap.key"

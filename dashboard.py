@@ -5,7 +5,13 @@ import torch
 from PIL import Image
 import io
 import os
-import time
+import sys
+
+# Ensure src module is visible
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+
+from src.ui.main_interface import MainInterface
+from src.ui.keyboard_manager import KeyboardManager
 
 # Configure Panel Extension and Theme Integration
 theme_manager.apply_to_app()
@@ -17,8 +23,27 @@ pn.extension(
     }
 )
 
-# Load Model using Core Classifier
-classifier = ProgressClassifier()
+# Inject JS for shortcuts natively
+with open('static/js/keyboard_shortcuts.js', 'r') as f:
+    js_code = f.read()
+
+# Custom CSS and the injected script
+shortcut_js = pn.pane.HTML(
+    f"<style>.keyboard-target {{ display: none !important; }}</style><script>{js_code}</script>",
+    width=0, height=0, margin=0, sizing_mode='fixed'
+)
+
+# Load model
+model_path = 'models/best_model.pth'
+class_names = ['Akara', 'Bread', 'Egusi', 'Moi Moi', 'Rice and Stew', 'Yam']
+os.makedirs('models', exist_ok=True)
+if os.path.exists(model_path):
+    model = models.resnet18(weights='IMAGENET1K_V1')
+    model.fc = torch.nn.Linear(model.fc.in_features, len(class_names))
+    model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+    model.eval()
+else:
+    model = None
 
 # Save image function
 def save_image(image_obj, predicted_class, image_name="uploaded_image.jpg"):
@@ -26,52 +51,100 @@ def save_image(image_obj, predicted_class, image_name="uploaded_image.jpg"):
     os.makedirs(save_dir, exist_ok=True)
     image_path = os.path.join(save_dir, image_name)
     image_obj.save(image_path)
+    return image_path
 
-# UI Components
-image_input = pn.widgets.FileInput(accept='image/*')
-output = pn.pane.Markdown("Upload an image of food 🍲")
-image_preview = ImageViewer(visible=False)
-loading_overlay = LoadingUI(visible=False)
+# State variables
+current_image = None
+current_predicted_class = None
 
-# Theme Toggle
-theme_toggle = theme_manager.get_header_toggle_btn()
-
-def update_progress(percent, message):
-    loading_overlay.progress = percent
-    loading_overlay.message = message
-    time.sleep(0.1)  # small pause to yield thread for UI updates
-
+# Interface Setup
 def classify(event=None):
-    if image_input.value is None:
-        output.object = "⚠️ Please upload an image first."
-        image_preview.visible = False
+    global current_image, current_predicted_class
+    if ui.image_input.value is None and current_image is None:
+        ui.output.object = "⚠️ Please upload an image first."
+        ui.image_preview.visible = False
         return
-    
-    try:
-        loading_overlay.visible = True
-        output.object = "⏳ Starting analysis..."
         
-        # Run classification with progress updates
-        predicted_class, image = classifier.classify_with_progress(
-            image_input.value, 
-            progress_callback=update_progress
-        )
+    try:
+        if ui.image_input.value is not None:
+             image = Image.open(io.BytesIO(ui.image_input.value)).convert('RGB')
+             current_image = image
+        else:
+             image = current_image
 
         # Update preview
-        image_preview.object = image
-        image_preview.visible = True
+        ui.image_preview.object = image
+        ui.image_preview.visible = True
 
-        # Save result
-        save_image(image, predicted_class)
-        output.object = f"✅ Identified as **{predicted_class}**. Result saved!"
+        # Start spinner
+        ui.spinner.value = True
+        ui.output.object = "🔍 Classifying..."
+
+        if model is None:
+            ui.output.object = "❌ Model weights not found. (Dummy run)"
+            predicted_class = class_names[0]
+        else:
+            # Transform and predict
+            img_tensor = transform(image).unsqueeze(0)
+            with torch.no_grad():
+                outputs = model(img_tensor)
+                _, pred = torch.max(outputs, 1)
+                predicted_class = class_names[pred.item()]
+
+        current_predicted_class = predicted_class
         
+        # Save image
+        saved_path = save_image(image, predicted_class)
+        ui.output.object = f"✅ Identified as **{predicted_class}**. Image saved!"
+        
+        # Add to history
+        history_item = f"- Identified **{predicted_class}**"
+        current_history = ui.history_panel[1].object
+        if current_history == "No history yet.":
+            ui.history_panel[1].object = history_item
+        else:
+            ui.history_panel[1].object = current_history + "\n" + history_item
+            
     except Exception as e:
-        output.object = f"❌ Error: {str(e)}"
+        ui.output.object = f"❌ Error: {str(e)}"
     finally:
-        loading_overlay.visible = False
+        ui.spinner.value = False
 
-run_button = pn.widgets.Button(name='Classify Dish 🍽️', button_type='primary', height=45)
-run_button.on_click(classify)
+def manual_export():
+    if current_image and current_predicted_class:
+        save_image(current_image, current_predicted_class, image_name="manual_export.jpg")
+        ui.output.object = f"💾 Manually exported results for **{current_predicted_class}**"
+
+def handle_shortcut(combo):
+    global current_image, current_predicted_class
+    if combo == 'enter':
+        classify()
+    elif combo == 'escape':
+        ui.clear_image()
+        current_image = None
+        current_predicted_class = None
+    elif combo == 'ctrl+s':
+        manual_export()
+    elif combo == 'ctrl+h':
+        ui.toggle_history()
+    elif combo == 'ctrl+d':
+        # Toggle dark mode
+        if 'dark-theme' in app.css_classes:
+            app.css_classes = [c for c in app.css_classes if c != 'dark-theme']
+            try:
+                pn.config.theme = 'default'
+            except:
+                pass
+        else:
+            app.css_classes = app.css_classes + ['dark-theme']
+            try:
+                pn.config.theme = 'dark'
+            except:
+                pass
+
+
+ui = MainInterface(classify_fn=classify, save_image_fn=manual_export)
+keyboard_manager = KeyboardManager(handle_shortcut)
 
 # Header
 header = pn.Row(
@@ -81,27 +154,12 @@ header = pn.Row(
     css_classes=['header']
 )
 
-# Main Dashboard Area
-dashboard_body = pn.Column(
-    pn.pane.Markdown("### Upload an image and let FlavorSnap identify it in seconds. 🥗", styles={'font-size': '1.1rem'}),
-    pn.Row(
-        pn.Column(
-            pn.pane.Markdown("#### Controls"),
-            image_input, 
-            run_button,
-            loading_overlay, # Component for loading overlay
-            width=300
-        ),
-        pn.Column(
-            pn.pane.Markdown("#### Preview & Results"),
-            image_preview, 
-            output,
-            sizing_mode='stretch_width'
-        ),
-        sizing_mode='stretch_width'
-    ),
-    sizing_mode='stretch_width',
-    css_classes=['dashboard-container']
+# Dashboard Layout
+app = pn.Column(
+    shortcut_js,
+    keyboard_manager.get_widget(),
+    ui.get_layout(),
+    css_classes=[]
 )
 
 # App Assembly
