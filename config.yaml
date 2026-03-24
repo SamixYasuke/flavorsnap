@@ -8,6 +8,61 @@ app:
   environment: "${NODE_ENV:-development}"
   debug: "${DEBUG:-false}"
   
+# Installation Validation Settings
+installation:
+  # Validation requirements
+  requirements:
+    python:
+      min_version: "3.8"
+      recommended_version: "3.9"
+    node:
+      min_version: "18.0"
+      recommended_version: "18.17"
+    ram:
+      min_mb: 4096
+      recommended_mb: 8192
+    storage:
+      min_mb: 10240
+      recommended_mb: 20480
+  
+  # Platform support
+  platforms:
+    windows:
+      supported: true
+      gpu_support: true
+      package_manager: "chocolatey"
+    macos:
+      supported: true
+      gpu_support: true
+      package_manager: "homebrew"
+    linux:
+      supported: true
+      gpu_support: true
+      package_manager: "apt"
+  
+  # Installation methods
+  methods:
+    auto:
+      enabled: true
+      priority: 1
+      description: "Automated detection and installation"
+    docker:
+      enabled: true
+      priority: 2
+      description: "Containerized installation"
+    manual:
+      enabled: true
+      priority: 3
+      description: "Manual step-by-step installation"
+  
+  # Validation checks
+  validation:
+    dependencies: true
+    configuration: true
+    model_integrity: true
+    network_connectivity: false
+    gpu_support: false
+    
 # Docker Configuration
 docker:
   # Container Registry
