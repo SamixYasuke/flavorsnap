@@ -20,6 +20,7 @@ api:
       - /redoc
       - /openapi.json
       - /health
+      - /static
   cors:
     allow_origins:
       - "*"
@@ -30,3 +31,63 @@ api:
 model:
   path: models/best_model.pth
   classes_path: food_classes.txt
+pwa:
+  enabled: true
+  cache_duration_hours: 24
+  offline_storage_path: offline_data.db
+  background_sync: true
+  push_notifications: false
+  install_prompt: true
+  theme_color: "#2196F3"
+  background_color: "#ffffff"
+  display: "standalone"
+  orientation: "portrait"
+  start_url: "/"
+  scope: "/"
+  icons:
+    - src: "/static/icons/icon-72x72.png"
+      sizes: "72x72"
+      type: "image/png"
+    - src: "/static/icons/icon-96x96.png"
+      sizes: "96x96"
+      type: "image/png"
+    - src: "/static/icons/icon-128x128.png"
+      sizes: "128x128"
+      type: "image/png"
+    - src: "/static/icons/icon-144x144.png"
+      sizes: "144x144"
+      type: "image/png"
+    - src: "/static/icons/icon-152x152.png"
+      sizes: "152x152"
+      type: "image/png"
+    - src: "/static/icons/icon-192x192.png"
+      sizes: "192x192"
+      type: "image/png"
+    - src: "/static/icons/icon-384x384.png"
+      sizes: "384x384"
+      type: "image/png"
+    - src: "/static/icons/icon-512x512.png"
+      sizes: "512x512"
+      type: "image/png"
+  shortcuts:
+    - name: "Classify Food"
+      short_name: "Classify"
+      description: "Upload and classify food images"
+      url: "/classify"
+      icons:
+        - src: "/static/icons/icon-96x96.png"
+          sizes: "96x96"
+  screenshots:
+    - src: "/static/screenshots/desktop.png"
+      sizes: "1280x720"
+      type: "image/png"
+      form_factor: "wide"
+    - src: "/static/screenshots/mobile.png"
+      sizes: "375x667"
+      type: "image/png"
+      form_factor: "narrow"
+  categories:
+    - "food"
+    - "photography"
+    - "utilities"
+    - "ai"

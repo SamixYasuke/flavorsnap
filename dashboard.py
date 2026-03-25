@@ -7,6 +7,8 @@ import io
 import os
 import sys
 from pathlib import Path
+from datetime import datetime
+import hashlib
 
 # Add src to Python path for imports
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
@@ -17,14 +19,105 @@ from src.ui.error_messages import handle_and_display_error, create_error_banner,
 from src.core.image_enhancer import ImageEnhancer
 from src.core.classifier import FlavorSnapClassifier
 from src.utils.error_handler import handle_user_errors, validate_image_file, UserFriendlyError
+from src.pwa.offline_manager import PWAManager
 
 # Configure Panel extensions with custom CSS and JS
 pn.extension('css', js_files={
-    'charts': ['static/js/charts.js']
+    'charts': ['static/js/charts.js'],
+    'pwa': ['static/js/pwa.js']
 }, css_files={
     'charts': ['static/css/charts.css'],
-    'error': ['static/css/error.css']
+    'error': ['static/css/error.css'],
+    'pwa': ['static/css/pwa.css']
 })
+
+# Initialize PWA Manager
+pwa_manager = PWAManager("offline_data.db")
+
+# PWA JavaScript template for service worker registration
+pwa_js_template = """
+<script>
+// Register Service Worker
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/static/sw.js')
+            .then((registration) => {
+                console.log('SW registered: ', registration);
+                
+                // Check for updates
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            // New content is available
+                            if (confirm('New version available! Reload to update?')) {
+                                window.location.reload();
+                            }
+                        }
+                    });
+                });
+            })
+            .catch((registrationError) => {
+                console.log('SW registration failed: ', registrationError);
+            });
+    });
+}
+
+// PWA Install Prompt
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    
+    // Show install button or banner
+    const installButton = document.getElementById('pwa-install-button');
+    if (installButton) {
+        installButton.style.display = 'block';
+        installButton.addEventListener('click', () => {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult.outcome === 'accepted') {
+                    console.log('User accepted the A2HS prompt');
+                } else {
+                    console.log('User dismissed the A2HS prompt');
+                }
+                deferredPrompt = null;
+            });
+        });
+    }
+});
+
+// Online/Offline Status Detection
+window.addEventListener('online', () => {
+    console.log('App is online');
+    document.body.classList.remove('offline');
+    
+    // Notify the server about online status
+    fetch('/api/pwa/status', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({online: true})
+    }).catch(console.error);
+});
+
+window.addEventListener('offline', () => {
+    console.log('App is offline');
+    document.body.classList.add('offline');
+    
+    // Notify the server about offline status
+    fetch('/api/pwa/status', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({online: false})
+    }).catch(console.error);
+});
+
+// Initialize PWA status
+if (!navigator.onLine) {
+    document.body.classList.add('offline');
+}
+</script>
+"""
 
 # Load model using the enhanced classifier
 classifier = FlavorSnapClassifier()
@@ -43,6 +136,69 @@ def save_image(image_obj, predicted_class, image_name="uploaded_image.jpg"):
     os.makedirs(save_dir, exist_ok=True)
     image_path = os.path.join(save_dir, image_name)
     image_obj.save(image_path)
+    
+    # Log analytics event for PWA
+    if pwa_manager:
+        pwa_manager.offline_manager.log_analytics_event('classification', {
+            'predicted_class': predicted_class,
+            'image_name': image_name,
+            'timestamp': datetime.now().isoformat()
+        })
+
+# PWA API endpoint handlers
+def handle_pwa_status(request):
+    """Handle PWA status updates from client."""
+    try:
+        data = request.json()
+        is_online = data.get('online', True)
+        
+        if pwa_manager:
+            pwa_manager.set_online_status(is_online)
+        
+        return {'status': 'success', 'online': is_online}
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
+
+def handle_pwa_sync(request):
+    """Handle PWA sync requests."""
+    try:
+        if not pwa_manager:
+            return {'status': 'error', 'message': 'PWA manager not available'}
+        
+        # Get pending sync items
+        pending_items = pwa_manager.offline_manager.get_sync_queue('pending')
+        
+        # Process sync items
+        synced_count = 0
+        for item in pending_items:
+            success = pwa_manager._process_sync_item(item)
+            if success:
+                pwa_manager.offline_manager.mark_synced(item['id'], 'synced')
+                synced_count += 1
+        
+        return {
+            'status': 'success',
+            'synced_items': synced_count,
+            'pending_items': len(pending_items) - synced_count
+        }
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
+
+def handle_pwa_cache(request):
+    """Handle PWA cache requests."""
+    try:
+        if not pwa_manager:
+            return {'status': 'error', 'message': 'PWA manager not available'}
+        
+        # Get cache statistics
+        stats = pwa_manager.get_status()
+        
+        return {
+            'status': 'success',
+            'cache_stats': stats
+        }
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}
 
 # Panel UI
 image_input = pn.widgets.FileInput(accept='image/*')
@@ -134,9 +290,28 @@ def classify(event=None):
 
     # Get preprocessing parameters
     preprocessing_params = preprocessing_controls.get_enhancement_params()
-
-    # Use enhanced classifier for detailed results
-    result = classifier.classify_image(image_to_classify, preprocessing_params)
+    
+    # Check if we have cached results for this image (PWA feature)
+    image_hash = hashlib.md5(image_input.value).hexdigest()
+    cache_key = f"classification_{image_hash}_{hash(str(preprocessing_params))}"
+    
+    if pwa_manager and not pwa_manager.is_online:
+        # Try to get cached result when offline
+        cached_result = pwa_manager.get_cached_api_response(cache_key)
+        if cached_result:
+            result = cached_result
+            output.object = "📱 Using cached classification result (offline mode)"
+        else:
+            output.object = "📱 No cached result available. Please connect to internet."
+            spinner.value = False
+            return
+    else:
+        # Perform classification when online
+        result = classifier.classify_image(image_to_classify, preprocessing_params)
+        
+        # Cache the result for offline use
+        if pwa_manager:
+            pwa_manager.cache_api_response(cache_key, result, expires_in_hours=24)
     
     # Extract results
     predicted_class = result['predicted_class']
@@ -154,8 +329,11 @@ def classify(event=None):
     entropy = result['metadata']['entropy']
     avg_confidence = result['metadata']['average_confidence']
     
+    # Add offline status indicator
+    offline_indicator = "📱 (Offline Mode)" if pwa_manager and not pwa_manager.is_online else "🌐 (Online)"
+    
     result_message = f"""
-✅ **Classification Result: {predicted_class}**
+✅ **Classification Result: {predicted_class}** {offline_indicator}
 
 ### 🎯 Confidence Scores
 - **Top Prediction:** {predicted_class} ({confidence_percentage:.1f}%)
@@ -205,7 +383,17 @@ def classify_with_error_handling(event):
 run_button = pn.widgets.Button(name='Classify', button_type='primary')
 run_button.on_click(classify_with_error_handling)
 
-# Create layout with preprocessing controls
+# Create PWA status indicator
+pwa_status = pn.pane.HTML("""
+<div id="pwa-status" style="position: fixed; top: 10px; right: 10px; z-index: 1000;">
+    <span id="connection-status" class="online-indicator">🌐 Online</span>
+    <button id="pwa-install-button" style="display: none; margin-left: 10px;" class="pwa-install-btn">
+        📱 Install App
+    </button>
+</div>
+""")
+
+# Create layout with preprocessing controls and PWA features
 upload_section = pn.Column(
     "## 📤 Upload Image",
     image_input,
@@ -252,6 +440,7 @@ app = pn.Row(
 
 app = pn.Row(
     pn.Column(
+        pwa_status,
         upload_section,
         preview_section,
         classification_section,
@@ -262,4 +451,14 @@ app = pn.Row(
     sizing_mode='stretch_width',
 )
 
+# Add PWA JavaScript to the app
+app = pn.Column(
+    pn.pane.HTML(pwa_js_template),
+    app
+)
+
 app.servable()
+
+# Cleanup PWA manager on exit
+import atexit
+atexit.register(lambda: pwa_manager.close() if pwa_manager else None)
