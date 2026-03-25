@@ -123,12 +123,12 @@ For detailed information about project organization, file purposes, and developm
 - **Framework**: PyTorch
 - **Architecture**: ResNet18 (ImageNet pretrained)
 - **Image Processing**: Pillow & torchvision
-- **Model Serving**: Flask
+- **Model Serving**: FastAPI
 - **Inference**: CPU-optimized for deployment
 
 ### ⚙️ Backend
 
-- **API**: Flask with RESTful endpoints
+- **API**: FastAPI with RESTful endpoints
 - **Language**: Python 3.8+
 - **File Storage**: Local filesystem (configurable)
 - **Image Processing**: Pillow, OpenCV
@@ -153,11 +153,11 @@ For detailed information about project organization, file purposes, and developm
 
 ### 📋 Prerequisites
 
-- **Node.js** 18+ and npm/yarn
-- **Python** 3.8+ and pip  
-- **Git** for version control
-- **Docker** & **Docker Compose** (recommended)
+- **Python** 3.8+ and pip ([download](https://www.python.org/downloads/))
+- **Node.js** 18+ and npm/yarn ([download](https://nodejs.org/))
+- **Git** ([download](https://git-scm.com/downloads))
 - **4GB+ RAM** for model loading
+- ~3GB disk space (PyTorch is large)
 
 ### ⚡ One-Click Installation (Recommended)
 
@@ -337,7 +337,65 @@ git clone https://github.com/your-username/flavorsnap.git
 cd flavorsnap
 ```
 
-#### 2. Frontend Setup
+#### 2. Python Backend Setup
+
+Create and activate a virtual environment, then install all dependencies:
+
+<details>
+<summary><strong>🪟 Windows (PowerShell)</strong></summary>
+
+```powershell
+python -m venv venv
+venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+</details>
+
+<details>
+<summary><strong>🪟 Windows (Command Prompt)</strong></summary>
+
+```cmd
+python -m venv venv
+venv\Scripts\activate.bat
+pip install -r requirements.txt
+```
+
+</details>
+
+<details>
+<summary><strong>🍎 macOS</strong></summary>
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+</details>
+
+<details>
+<summary><strong>🐧 Linux</strong></summary>
+
+```bash
+# Ensure venv module is installed (Debian/Ubuntu)
+sudo apt-get install python3-venv python3-dev gcc
+
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+</details>
+
+> **GPU Support (Optional):** The default install is CPU-only. For NVIDIA GPU acceleration:
+> ```bash
+> # CUDA 12.1
+> pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+> ```
+> See [pytorch.org/get-started](https://pytorch.org/get-started/locally/) for the full matrix.
+
+#### 3. Frontend Setup
 
 ```bash
 cd frontend
@@ -347,83 +405,19 @@ cp .env.example .env.local
 npm run dev
 ```
 
-#### 3. Backend Setup
+#### 4. Start the API Server
 
 ```bash
+# From the project root, with venv activated
 cd ml-model-api
-pip install -r requirements.txt
 python app.py
 ```
 
-## ⚙️ Configuration
-
-FlavorSnap uses a comprehensive configuration system with environment variables and YAML files. For detailed configuration information, see the [Configuration Guide](docs/configuration.md).
-
-### Environment Setup
-
-1. **Copy the environment template**:
-   ```bash
-   cp .env.example .env
-   ```
-
-2. **Configure essential variables**:
-   ```bash
-   # Application
-   NODE_ENV=development
-   DEBUG=true
-   
-   # Database
-   POSTGRES_HOST=localhost
-   POSTGRES_DB=flavorsnap
-   POSTGRES_USER=flavorsnap
-   POSTGRES_PASSWORD=your_secure_password
-   
-   # Security
-   JWT_SECRET=your_super_secret_jwt_key_here
-   
-   # Frontend
-   NEXT_PUBLIC_API_URL=http://localhost:5000
-   ```
-
-3. **Validate your configuration**:
-   ```bash
-   python scripts/validate_config.py --environment development
-   ```
-
-### Configuration Files
-
-- `config/default.yaml` - Default configuration values
-- `config/development.yaml` - Development-specific overrides
-- `config/production.yaml` - Production-specific overrides
-- `docs/configuration.md` - Comprehensive configuration documentation
-
-### Key Configuration Areas
-
-- **Database**: PostgreSQL and Redis settings
-- **Security**: JWT secrets, SSL certificates, and container security
-- **Resources**: CPU and memory limits for containers
-- **Monitoring**: Prometheus and Grafana configuration
-- **Features**: Feature flags for enabling/disabling functionality
-
-### Production Deployment
-
-For production deployment, ensure you:
-
-1. Set `NODE_ENV=production`
-2. Configure SSL certificates
-3. Use strong database passwords
-4. Enable monitoring and logging
-5. Review resource limits and autoscaling settings
-
-```bash
-# Validate production configuration
-python scripts/validate_config.py --environment production --check-ssl --check-database
-```
-
-#### 4. Access Application
+#### 5. Access Application
 
 - Frontend: http://localhost:3000
 - API: http://localhost:5000
+- API Health: http://localhost:5000/health
 
 ## 📖 Detailed Setup
 
@@ -453,17 +447,38 @@ NODE_ENV=development
 DEBUG=true
 ```
 
-### Python Environment Setup
+### Python Virtual Environment
+
+All Python commands assume the virtual environment is activated:
 
 ```bash
-# Create virtual environment
+# Create virtual environment (only once)
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# Install dependencies
-pip install -r ml-model-api/requirements.txt
-pip install torch torchvision pillow flask
+# Activate (run every time you open a new terminal)
+source venv/bin/activate      # macOS / Linux
+venv\Scripts\activate          # Windows CMD
+venv\Scripts\Activate.ps1      # Windows PowerShell
+
+# Install all core dependencies
+pip install -r requirements.txt
+
+# For development (includes linting, testing, formatting)
+pip install -r requirements-dev.txt
+
+# Verify installation
+python -c "import torch; print(f'PyTorch {torch.__version__} — GPU: {torch.cuda.is_available()}')"
 ```
+
+> **Deactivate** the virtual environment when done: `deactivate`
+
+### Dependency Files
+
+| File | Purpose |
+|------|---------|
+| `requirements.txt` | Core runtime dependencies (torch, flask, pillow, etc.) |
+| `requirements-dev.txt` | Dev tools (pytest, flake8, black, mypy) + core deps |
+| `docs/dependencies.md` | Full dependency documentation with troubleshooting |
 
 ### Model Setup
 
@@ -615,7 +630,13 @@ cd flavorsnap
 #### 2. Setup Development Environment
 
 ```bash
-npm run dev:setup
+# Python backend
+python -m venv venv
+source venv/bin/activate  # or venv\Scripts\activate on Windows
+pip install -r requirements-dev.txt
+
+# Frontend
+cd frontend && npm install
 ```
 
 #### 3. Create Feature Branch
@@ -725,6 +746,87 @@ Follow [Conventional Commits](https://conventionalcommits.org/):
 ## 📝 API Documentation
 
 ### Endpoints
+
+### Current REST API
+
+FlavorSnap now exposes a FastAPI-based REST API with generated OpenAPI documentation.
+
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+- OpenAPI schema: `http://localhost:8000/openapi.json`
+
+#### POST /api/v1/classify
+
+Classify an uploaded food image with multipart form data.
+
+**Form fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `image` | file | yes | JPEG, PNG, or WebP image |
+| `resize` | int | no | Square resize target before inference. Default: `224` |
+| `center_crop` | bool | no | Apply center crop after resize. Default: `true` |
+| `normalize` | bool | no | Apply ImageNet normalization. Default: `true` |
+| `top_k` | int | no | Number of ranked predictions to return. Default: `3` |
+
+**Request:**
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/classify" \
+  -F "image=@/path/to/food.jpg" \
+  -F "resize=256" \
+  -F "center_crop=true" \
+  -F "normalize=true" \
+  -F "top_k=3"
+```
+
+**Response:**
+
+```json
+{
+  "prediction": "Moi Moi",
+  "confidence": 0.91,
+  "predictions": [
+    { "label": "Moi Moi", "confidence": 0.91 },
+    { "label": "Akara", "confidence": 0.06 },
+    { "label": "Bread", "confidence": 0.03 }
+  ],
+  "preprocessing": {
+    "resize": 256,
+    "center_crop": true,
+    "normalize": true,
+    "top_k": 3
+  },
+  "processing_time_ms": 18.247,
+  "filename": "food.jpg",
+  "request_id": "4b3709df-4d1f-4cad-95f7-9e86b629f470"
+}
+```
+
+**Error codes:**
+
+- `400`: empty upload or invalid image payload
+- `413`: file exceeds configured upload size
+- `415`: unsupported content type
+- `429`: rate limit exceeded
+- `500`: model loading or inference failure
+
+#### GET /api/v1/health
+
+Check API health and model readiness.
+
+**Response:**
+
+```json
+{
+  "status": "ok",
+  "model_loaded": true,
+  "classes": ["Akara", "Bread", "Egusi", "Moi Moi", "Rice and Stew", "Yam"],
+  "startup_error": null
+}
+```
+
+### Legacy notes
 
 #### POST /predict
 
@@ -846,32 +948,32 @@ npm run test
 npm run test:coverage
 npm run test:e2e
 
-# Backend tests
-cd ml-model-api
-python -m pytest
-python -m pytest --cov=app
+# Backend (FastAPI API + Panel UI) tests
+# Runs only tests under `tests/` (see repo `pyproject.toml`).
+python scripts/run_tests.py
 
-# Integration tests
-npm run test:integration
+# Same suite with coverage (enforces 90%+).
+python scripts/coverage_report.py
+
+# Performance benchmarks
+python scripts/run_tests.py --performance-smoke
+python scripts/run_tests.py --performance-full
 ```
 
 ### Test Structure
 
 ```
 tests/
-├── 📁 frontend/
-│   ├── 📁 components/          # Component tests
-│   ├── 📁 pages/              # Page tests
-│   └── 📁 utils/              # Utility tests
-├── 📁 backend/
-│   ├── 📁 api/                # API endpoint tests
-│   └── 📁 model/              # Model tests
-└── 📁 e2e/                    # End-to-end tests
+├── 📁 api/                    # FastAPI endpoint tests (existing)
+├── 📁 unit/                   # Core module unit tests
+├── 📁 integration/            # API/UI integration tests
+└── 📁 performance/           # pytest-benchmark performance checks
 ```
 
 ### Test Data
 
-Test images are available in `tests/fixtures/images/` with proper labels for validation.
+Most Python fixtures are generated deterministically at runtime (see `tests/conftest.py`).
+Any on-disk lightweight assets live under `tests/fixtures/`.
 
 ## 📊 Model Information
 
