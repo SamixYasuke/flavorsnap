@@ -42,6 +42,8 @@ const withPWA = require("next-pwa")({
     },
   ],
 });
+// 1. Properly import the i18n configuration
+const { i18n } = require("./next-i18next.config.js");
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,

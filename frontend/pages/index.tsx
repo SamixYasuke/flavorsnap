@@ -7,13 +7,6 @@ import type { GetStaticProps } from "next";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useKeyboardShortcuts } from "@/utils/useKeyboardShortcuts";
 
-export default function Classify() {
-  const { t } = useTranslation("common");
-  const [image, setImage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [classification, setClassification] = useState<any>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleReset = () => {
     setImage(null);

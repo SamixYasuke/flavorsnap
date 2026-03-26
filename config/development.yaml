@@ -1,0 +1,132 @@
+# FlavorSnap Development Configuration
+# Development-specific overrides for default configuration
+
+# Application Settings
+app:
+  environment: "development"
+  debug: true
+  
+# Frontend Configuration
+frontend:
+  container:
+    replicas: 1
+    
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+      
+  environment:
+    NODE_ENV: "development"
+    NEXT_PUBLIC_API_URL: "http://localhost:5000"
+    ENABLE_ANALYTICS: false
+    ENABLE_DARK_MODE: true
+
+# Backend Configuration
+backend:
+  container:
+    replicas: 1
+    
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+      
+  environment:
+    FLASK_ENV: "development"
+    FLASK_DEBUG: 1
+    LOG_LEVEL: "DEBUG"
+
+# Database Configuration
+database:
+  postgres:
+    host: "localhost"
+    ssl_mode: "disable"
+    
+  redis:
+    host: "localhost"
+
+# Storage Configuration
+storage:
+  uploads:
+    path: "./uploads"
+    max_size: "10MB"
+    cleanup_interval: "1h"
+    
+  models:
+    path: "./models"
+    backup_enabled: false
+
+# Monitoring Configuration
+monitoring:
+  prometheus:
+    enabled: false
+    
+  grafana:
+    enabled: false
+
+# Logging Configuration
+logging:
+  level: "DEBUG"
+  format: "text"
+  
+  application:
+    path: "./logs"
+    rotation: "hourly"
+    retention: "7d"
+
+# Security Configuration
+security:
+  containers:
+    read_only_rootfs: false
+    drop_capabilities: []
+    
+  network:
+    internal: false
+    allow_external: true
+
+# Performance Configuration
+performance:
+  autoscaling:
+    enabled: false
+    
+  caching:
+    enabled: false
+
+# Health Check Configuration
+health:
+  interval: "10s"
+  timeout: "5s"
+  retries: 1
+  start_period: "5s"
+
+# Rate Limiting
+rate_limiting:
+  api:
+    requests_per_minute: 100
+    burst: 20
+    
+  upload:
+    requests_per_minute: 20
+    burst: 5
+
+# External Services
+external_services:
+  email:
+    enabled: false
+    
+  cloud_storage:
+    enabled: false
+    
+  cdn:
+    enabled: false
+
+# SSL/TLS Configuration
+ssl:
+  enabled: false

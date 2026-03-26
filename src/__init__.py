@@ -1,0 +1,1 @@
+"""FlavorSnap Python package."""

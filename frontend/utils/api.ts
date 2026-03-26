@@ -32,9 +32,12 @@ const apiRequest = async <T = any>(
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
+      const isFormData = typeof FormData !== "undefined" && fetchOptions.body instanceof FormData;
+      const defaultHeaders = isFormData ? {} : { "Content-Type": "application/json" };
+
       const response = await fetch(url, {
         headers: {
-          "Content-Type": "application/json",
+          ...defaultHeaders,
           ...fetchOptions.headers,
         },
         ...fetchOptions,
@@ -87,7 +90,7 @@ export const api = {
   post: <T = any>(url: string, data?: any, options?: ApiOptions) =>
     apiRequest<T>(url, {
       method: "POST",
-      body: data ? JSON.stringify(data) : undefined,
+      body: (typeof FormData !== "undefined" && data instanceof FormData) ? data : (data ? JSON.stringify(data) : undefined),
       ...options,
     }),
 

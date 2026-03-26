@@ -1,0 +1,118 @@
+/**
+ * Premium Loading States - Skeleton Loaders & Progress Feedbacks
+ */
+
+/* Skeleton Loader Base Animation */
+@keyframes skeleton-shimmer {
+  0% { background-position: -200px 0; }
+  100% { background-position: 200px 0; }
+}
+
+.skeleton-box {
+  display: inline-block;
+  height: 1em;
+  position: relative;
+  overflow: hidden;
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
+}
+
+.skeleton-box::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background-image: linear-gradient(
+    90deg, 
+    transparent 0, 
+    rgba(255, 255, 255, 0.05) 20%, 
+    rgba(255, 255, 255, 0.1) 60%, 
+    transparent 100%
+  );
+  background-size: 200px 100%;
+  animation: skeleton-shimmer 1.5s infinite linear;
+}
+
+.skeleton-card {
+  width: 100%;
+  height: 300px;
+  border-radius: 12px;
+}
+
+/* Progress Bar Styles */
+.progress-container {
+  width: 100%;
+  background-color: var(--bg-tertiary);
+  border-radius: 99px;
+  margin: 1.5rem 0;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  height: 12px;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  width: 0%;
+  transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+.loading-message {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.time-estimation {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Modal Processing Overlay */
+.processing-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(var(--bg-primary-rgb), 0.8);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  border-radius: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.processing-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.cancel-btn {
+  margin-top: 2rem;
+  background-color: transparent;
+  color: var(--status-error);
+  border: 1px solid var(--status-error);
+  padding: 0.4rem 1rem;
+  font-size: 0.85rem;
+}
+
+.cancel-btn:hover {
+  background-color: var(--status-error);
+  color: white;
+}

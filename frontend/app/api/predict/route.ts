@@ -1,37 +1,48 @@
-import { NextRequest, NextResponse } from "next/server";
-import { writeFile } from "fs/promises";
-import { join } from "path";
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const formData = await request.formData();
-    const file = formData.get("image") as File | null;
+    const formData = await req.formData();
+    // 1. Get the file from the incoming frontend request
+    const file = formData.get('file');
 
     if (!file) {
-      return NextResponse.json({ error: "No image provided" }, { status: 400 });
+      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    // 2. Prepare the data for the Python ML API (Switching key to 'image')
+    const mlFormData = new FormData();
+    mlFormData.append('image', file);
 
-    const uploadDir = join(process.cwd(), "public", "uploads");
-    const filename = `${Date.now()}-${file.name.replace(/\s+/g, "-")}`;
-    const path = join(uploadDir, filename);
+    // 3. Connect to the Flask server running on port 8000
+    const ML_API_URL = 'http://127.0.0.1:8000/predict'; 
 
-    await writeFile(path, buffer);
-
-    return NextResponse.json({
-      success: true,
-      prediction: "moi moi",
-      confidence: 0.982,
-      metadata: {
-        filename: filename,
-        size: file.size,
-        type: file.type,
-      },
+    const response = await fetch(ML_API_URL, {
+      method: 'POST',
+      body: mlFormData,
     });
-  } catch (error) {
-    console.error("Upload Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`ML API Error (${response.status}): ${errorText}`);
+    }
+
+    const result = await response.json();
+
+    // 4. Return the prediction result back to the browser
+    return NextResponse.json({
+      label: result.label || result.class_name || "Unknown",
+      confidence: result.confidence ?? 0,
+      all_predictions: result.all_predictions || [],
+      processing_time: result.processing_time || 0,
+      success: true
+    });
+
+  } catch (error: any) {
+    console.error("ML Bridge Error:", error);
+    return NextResponse.json({ 
+      error: "ML Service Unavailable", 
+      details: error.message 
+    }, { status: 500 });
   }
 }

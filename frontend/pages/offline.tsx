@@ -7,6 +7,8 @@ export default function Offline() {
       <Head>
         <title>Offline - FlavorSnap</title>
         <meta name="description" content="You are currently offline" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="robots" content="noindex" />
       </Head>
       
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
