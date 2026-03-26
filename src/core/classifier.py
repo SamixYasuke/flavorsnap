@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.core.image_enhancer import ImageEnhancer
 from src.utils.error_handler import handle_user_errors, safe_image_operation, UserFriendlyError
+from src.core.debounced_classifier import get_debounced_classifier
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,9 @@ class FlavorSnapClassifier:
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
+        
+        # Initialize debounced classifier for real-time processing
+        self.debounced_classifier = get_debounced_classifier()
         
         self._load_model()
     
@@ -164,6 +168,33 @@ class FlavorSnapClassifier:
         
         logger.info(f"Classification successful: {predicted_class} (confidence: {confidence_score:.3f})")
         return result
+    
+    def classify_image_realtime(self, 
+                              image: Image.Image, 
+                              preprocessing_params: Optional[Dict[str, Any]] = None,
+                              callback: Optional[Callable] = None) -> str:
+        """
+        Classify an image in real-time with debouncing.
+        
+        Args:
+            image: PIL Image to classify
+            preprocessing_params: Optional preprocessing parameters
+            callback: Optional callback function for results
+            
+        Returns:
+            Request ID for tracking
+        """
+        return self.debounced_classifier.classify_image_debounced(
+            image, preprocessing_params, callback
+        )
+    
+    def enable_realtime(self, enabled: bool = True):
+        """Enable or disable real-time classification."""
+        self.debounced_classifier.enable_realtime(enabled)
+    
+    def get_realtime_stats(self) -> Dict[str, Any]:
+        """Get real-time classification statistics."""
+        return self.debounced_classifier.get_performance_stats()
     
     def _calculate_entropy(self, probabilities: Dict[str, float]) -> float:
         """

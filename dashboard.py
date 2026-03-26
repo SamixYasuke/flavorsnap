@@ -2,14 +2,11 @@ from src.ui import theme_manager, ImageViewer, LoadingUI, SkeletonCard
 from src.core import ProgressClassifier
 from src.utils.memory_manager import MemoryManager
 from src.ui.export_panel import ExportPanel
+from src.ui.realtime_preview import RealtimePreview
 import panel as pn
 import torch
 import torchvision.models as models
 import torchvision.transforms as transforms
-import panel as pn
-import torch
-import torchvision.transforms as transforms
-from torchvision import models
 from PIL import Image
 import io
 import os
@@ -28,7 +25,8 @@ pn.extension(
     css_files=['static/css/image_viewer.css', 'static/css/loading.css'],
     js_files={
         'image_viewer': 'static/js/image_viewer.js',
-        'progress_tracker': 'static/js/progress_tracker.js'
+        'progress_tracker': 'static/js/progress_tracker.js',
+        'realtime': 'static/js/realtime.js'
     }
 )
 
@@ -42,30 +40,8 @@ shortcut_js = pn.pane.HTML(
     width=0, height=0, margin=0, sizing_mode='fixed'
 )
 
-# Load model
-model_path = 'models/best_model.pth'
-class_names = ['Akara', 'Bread', 'Egusi', 'Moi Moi', 'Rice and Stew', 'Yam']
-os.makedirs('models', exist_ok=True)
-
-# Image transform
-transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-])
-
-if os.path.exists(model_path):
-    model = models.resnet18(weights='IMAGENET1K_V1')
-    model.fc = torch.nn.Linear(model.fc.in_features, len(class_names))
-    model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
-    model.eval()
-else:
-    model = None
-
-# Save image function
-from pathlib import Path
-
 # Add src to Python path for imports
+from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
 from src.ui.preprocessing_controls import PreprocessingControls
@@ -106,6 +82,7 @@ current_image = None
 current_predicted_class = None
 current_confidence = 0.0
 classification_history = []
+
 # Panel UI
 image_input = pn.widgets.FileInput(accept='image/*')
 output = pn.pane.Markdown("Upload an image of food 🍲")
@@ -125,6 +102,10 @@ confidence_chart_component = confidence_chart.create_layout()
 preprocessing_controls = PreprocessingControls()
 preprocessing_panel = preprocessing_controls.create_layout()
 
+# Real-time preview component
+realtime_preview = RealtimePreview()
+realtime_preview_panel = realtime_preview.create_layout()
+
 # Global variables
 original_image = None
 processed_image = None
@@ -136,6 +117,13 @@ def on_image_update(image):
     if image:
         processed_preview.object = image
         processed_preview.visible = True
+
+def on_realtime_update(image, preprocessing_params):
+    """Handle real-time classification updates."""
+    global processed_image
+    if image and realtime_preview.realtime_enabled:
+        processed_image = image
+        realtime_preview.update_image(original_image, image, preprocessing_params)
 
 @handle_user_errors("image upload and processing")
 def handle_image_upload():
@@ -166,6 +154,7 @@ def handle_image_upload():
     # Load image into preprocessing controls
     preprocessing_controls.load_image(original_image)
     preprocessing_controls.on_image_update = on_image_update
+    preprocessing_controls.set_realtime_callback(on_realtime_update)
     
     output.object = "📸 Image loaded! Use preprocessing controls to enhance, then classify."
 
@@ -192,50 +181,6 @@ def classify(event=None):
         # Use processed image for classification
         image_to_classify = processed_image
 
-        # Start spinner
-        ui.spinner.value = True
-        ui.output.object = "🔍 Classifying..."
-
-        if model is None:
-            ui.output.object = "❌ Model weights not found. (Dummy run)"
-            predicted_class = class_names[0]
-            confidence = 0.5
-        else:
-            # Transform and predict
-            img_tensor = transform(image).unsqueeze(0)
-            with torch.no_grad():
-                outputs = model(img_tensor)
-                probabilities = torch.nn.functional.softmax(outputs, dim=1)
-                confidence, pred = torch.max(probabilities, 1)
-                predicted_class = class_names[pred.item()]
-                confidence = confidence.item()
-
-        current_predicted_class = predicted_class
-        current_confidence = confidence
-        
-        # Save image
-        saved_path = save_image(image, predicted_class)
-        ui.output.object = f"✅ Identified as **{predicted_class}** ({confidence:.1%} confidence). Image saved!"
-        
-        # Update export panel with current data
-        export_panel.set_current_data(image, predicted_class, confidence)
-        
-        # Add to history
-        history_item = f"- Identified **{predicted_class}** ({confidence:.1%} confidence)"
-        current_history = ui.history_panel[1].object
-        if current_history == "No history yet.":
-            ui.history_panel[1].object = history_item
-        else:
-            ui.history_panel[1].object = current_history + "\n" + history_item
-            
-        # Add to classification history for batch export
-        classification_history.append({
-            'timestamp': datetime.now().isoformat(),
-            'predicted_class': predicted_class,
-            'confidence': confidence,
-            'image': image.copy()
-        })
-            
         # Get preprocessing parameters
         preprocessing_params = preprocessing_controls.get_enhancement_params()
 
@@ -259,60 +204,32 @@ def classify(event=None):
         avg_confidence = result['metadata']['average_confidence']
         
         result_message = f"""
-    # Clear any previous errors
-    error_banner.visible = False
-    
-    # Start spinner
-    spinner.value = True
-    output.object = "🔍 Classifying..."
+**Classification Result: {predicted_class}**
 
-    # Use processed image for classification
-    image_to_classify = processed_image
-
-    # Get preprocessing parameters
-    preprocessing_params = preprocessing_controls.get_enhancement_params()
-
-    # Use enhanced classifier for detailed results
-    result = classifier.classify_image(image_to_classify, preprocessing_params)
-    
-    # Extract results
-    predicted_class = result['predicted_class']
-    confidence_score = result['confidence']
-    all_probabilities = result['all_probabilities']
-    
-    # Update confidence chart with all probabilities
-    confidence_chart.update_predictions(all_probabilities, predicted_class)
-
-    # Save processed image
-    save_image(image_to_classify, predicted_class)
-    
-    # Create enhanced result message
-    confidence_percentage = confidence_score * 100
-    entropy = result['metadata']['entropy']
-    avg_confidence = result['metadata']['average_confidence']
-    
-    result_message = f"""
-✅ **Classification Result: {predicted_class}**
-
-### 🎯 Confidence Scores
+### Confidence Scores
 - **Top Prediction:** {predicted_class} ({confidence_percentage:.1f}%)
 - **Model Uncertainty (Entropy):** {entropy:.3f}
 - **Average Confidence:** {avg_confidence:.1f}%
 
-### 📊 Preprocessing Parameters Applied:
+### Preprocessing Parameters Applied:
 - **Brightness**: {preprocessing_params['brightness']:.1f}
 - **Contrast**: {preprocessing_params['contrast']:.1f}
 - **Rotation**: {preprocessing_params['rotation']:.0f}°
 - **Aspect Ratio**: {preprocessing_params.get('aspect_ratio', 'Original')}
 - **Crop**: {preprocessing_params.get('crop_box', 'None')}
 
-💾 Processed image saved to training data!
+Processed image saved to training data!
 
-📈 **View the confidence chart below** to see probabilities for all food classes.
-    """
-    
-    output.object = result_message
-    spinner.value = False
+**View the confidence chart below** to see probabilities for all food classes.
+        """
+        
+        output.object = result_message
+        spinner.value = False
+
+    except Exception as e:
+        output.object = f"❌ Error: {str(e)}"
+        spinner.value = False
+        confidence_chart.reset()
 
 # Setup image upload handler with error handling
 def handle_image_upload_with_error_handling():
@@ -326,12 +243,12 @@ def handle_image_upload_with_error_handling():
         # Reset chart on error
         confidence_chart.reset()
     finally:
-        ui.spinner.value = False
+        spinner.value = False
 
 def manual_export():
     if current_image and current_predicted_class:
         save_image(current_image, current_predicted_class, image_name="manual_export.jpg")
-        ui.output.object = f"💾 Manually exported results for **{current_predicted_class}**"
+        output.object = f"💾 Manually exported results for **{current_predicted_class}**"
 
 def export_callback(action, data=None):
     """Callback for export panel operations"""
@@ -347,9 +264,9 @@ def export_callback(action, data=None):
     elif action == 'get_batch_data':
         return classification_history.copy()
     elif action == 'export_completed':
-        ui.output.object = f"📤 Export completed: {data.get('filepath', 'unknown')}"
+        output.object = f"📤 Export completed: {data.get('filepath', 'unknown')}"
     elif action == 'batch_export_completed':
-        ui.output.object = f"📤 Batch export completed: {data.get('count', 0)} items exported to {data.get('filepath', 'unknown')}"
+        output.object = f"📤 Batch export completed: {data.get('count', 0)} items exported to {data.get('filepath', 'unknown')}"
     return None
 
 def handle_shortcut(combo):
@@ -379,7 +296,6 @@ def handle_shortcut(combo):
             except:
                 pass
 
-
 # Export panel setup
 export_panel = ExportPanel(on_export_callback=export_callback)
 
@@ -405,12 +321,7 @@ dashboard_body = pn.Row(
     sizing_mode='stretch_width'
 )
 
-app = pn.Column(
-    shortcut_js,
-    keyboard_manager.get_widget(),
-    css_classes=[]
-        handle_and_display_error(e, "image upload", handle_image_upload_with_error_handling)
-
+# Setup image upload handler with error handling
 image_input.param.watch(lambda event: handle_image_upload_with_error_handling(), 'value')
 
 # Setup classification handler with error handling
@@ -460,6 +371,12 @@ confidence_section = pn.Column(
     confidence_chart_component,
 )
 
+realtime_section = pn.Column(
+    "## 🔄 Real-time Preview",
+    realtime_preview_panel,
+)
+
+# Main app layout with real-time preview
 app = pn.Row(
     pn.Column(
         upload_section,
@@ -467,20 +384,9 @@ app = pn.Row(
         error_banner,  # Add error banner to the layout
         classification_section,
         confidence_section,
+        realtime_section,
         sizing_mode='stretch_width',
-        max_width=800,
-    ),
-    controls_section,
-    sizing_mode='stretch_width',
-)
-
-app = pn.Row(
-    pn.Column(
-        upload_section,
-        preview_section,
-        classification_section,
-        sizing_mode='stretch_width',
-        max_width=600,
+        max_width=900,
     ),
     controls_section,
     sizing_mode='stretch_width',
