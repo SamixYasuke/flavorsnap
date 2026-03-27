@@ -89,11 +89,14 @@ flavorsnap/
 | Document | Purpose |
 |----------|---------|
 | **[Project Structure](docs/project_structure.md)** | Complete directory structure and organization |
+| **[Blockchain Architecture](docs/blockchain.md)** | Decentralized governance and incentive design |
+| **[Smart Contracts](contracts/README.md)** | Technical documentation for developer and user interactions |
 | **[Development Workflow](docs/development_workflow.md)** | Development process and guidelines |
 | **[File Purposes](docs/file_purposes.md)** | Detailed file responsibilities |
 | **[Installation Guide](docs/installation.md)** | Comprehensive setup instructions |
 | **[Configuration Guide](docs/configuration.md)** | Configuration options and settings |
 | **[Troubleshooting Guide](docs/troubleshooting.md)** | Common issues and solutions |
+| **[Blockchain Integration](docs/blockchain.md)** | Role of Stellar and Soroban in the ecosystem |
 
 ### Development Tools
 
